@@ -25,15 +25,21 @@ class Scanner_model extends CI_Model
                 $file_content = file_get_contents($file);
                 if ($this->check_fake_image_header($file_content)) {
                     $this->detection_results[$file]['fake_image_header'] = true;
-                    $this->detection_results[$file]['score'] = isset($this->detection_results[$file]['score']) ? $this->detection_results[$file]['score'] + 5 : 5;
-                    $check .= ' (Fake Image Header)';
+                    $check['score'] = isset($check['score']) ? $check['score'] + 5 : 5;
+                    $check['details'] .= ' (Fake Image Header)';
                 }
+
+                $status = empty($check) ? 'Aman' : 'Ditemukan (' . $check['details'] . ')';
+                $color = empty($check) ? 'green' : 'red';
+                $score = isset($check['score']) ? $check['score'] : 0;
+                $suspicion_level = isset($check['suspicion_level']) ? $check['suspicion_level'] : 'Rendah';
 
                 $results[] = array(
                     'file' => $file,
-                    'status' => empty($check) ? 'Safe' : 'Found (' . $check . ')',
-                    'color' => empty($check) ? 'green' : 'red',
-                    'score' => isset($this->detection_results[$file]['score']) ? $this->detection_results[$file]['score'] : 0
+                    'status' => $status,
+                    'color' => $color,
+                    'score' => $score,
+                    'suspicion_level' => $suspicion_level
                 );
             }
         }
@@ -286,11 +292,11 @@ class Scanner_model extends CI_Model
             'include',
             'include_once',
             'require',
-            'require_once' // fungsi yang sering digunakan dengan aman
+            'require_once'
         ];
 
         $found = array_intersect($patterns, $content);
-        $found = array_diff($found, $whitelist); // Hapus fungsi yang di-whitelist
+        $found = array_diff($found, $whitelist);
 
         $score = 0;
         $detected = [];
@@ -302,12 +308,30 @@ class Scanner_model extends CI_Model
             }
         }
 
-        $threshold = 5; // Sesuaikan ambang batas sesuai kebutuhan
-        if ($score >= $threshold) {
-            return implode(', ', $detected) . ' (Total Skor: ' . $score . ', Kemungkinan Backdoor)';
+        $suspicion_level = $this->get_suspicion_level($score);
+
+        if ($score > 0) {
+            return [
+                'details' => implode(', ', $detected),
+                'score' => $score,
+                'suspicion_level' => $suspicion_level
+            ];
         }
 
         return "";
+    }
+
+    private function get_suspicion_level($score)
+    {
+        if ($score < 10) {
+            return 'Rendah (Kemungkinan bukan backdoor)';
+        } elseif ($score < 15) {
+            return 'Sedang (Perlu diperiksa lebih lanjut)';
+        } elseif ($score < 20) {
+            return 'Tinggi (Kemungkinan besar backdoor)';
+        } else {
+            return 'Sangat Tinggi (Hampir pasti backdoor)';
+        }
     }
 
     private function get_pattern_weight($pattern)

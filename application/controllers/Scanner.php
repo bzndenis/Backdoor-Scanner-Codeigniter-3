@@ -1,26 +1,31 @@
 <?php
-defined('BASEPATH') OR exit('No direct script access allowed');
+defined('BASEPATH') or exit('No direct script access allowed');
 
-class Scanner extends CI_Controller {
+class Scanner extends CI_Controller
+{
 
-    public function __construct() {
+    public function __construct()
+    {
         parent::__construct();
         $this->load->library('session');
     }
 
-    public function index() {
+    public function index()
+    {
         $this->load->helper('url');
         $this->load->view('scanner_view');
     }
 
-    public function scan() {
+    public function scan()
+    {
         $this->load->model('Scanner_model');
         $result = $this->Scanner_model->scan_directory('.');
         $data['result'] = $result;
         $this->load->view('scanner_result', $data);
     }
 
-    public function upload() {
+    public function upload()
+    {
         $config['upload_path'] = './uploads/';
         $config['allowed_types'] = 'gif|jpg|png|php|html|txt|zip';
         $config['max_size'] = 1024000; // 100MB
@@ -68,22 +73,25 @@ class Scanner extends CI_Controller {
             unlink($file_path);
 
             // Tambahkan logika untuk mengumpulkan backdoor yang ditemukan
-            $backdoors = [];
-            foreach ($data['result'] as $res) {
-                if (strpos($res['status'], 'Found') !== false) {
-                    $backdoors[] = $res['file'] . ' => ' . $res['status'];
+            $backdoors = array();
+            foreach ($data['result'] as $result) {
+                if (isset($result['score']) && $result['score'] > 0) {
+                    $backdoors[] = array(
+                        'file' => $result['file'],
+                        'status' => $result['status'],
+                        'score' => $result['score'],
+                        'suspicion_level' => $result['suspicion_level']
+                    );
                 }
             }
             $data['backdoors'] = $backdoors;
-
-            // Simpan backdoors ke sesi
-            $this->session->set_userdata('backdoors', $backdoors);
 
             $this->load->view('scanner_result', $data);
         }
     }
 
-    public function export_backdoors() {
+    public function export_backdoors()
+    {
         // Ambil backdoors dari sesi
         $backdoors = $this->session->userdata('backdoors');
         $content = implode("\n", $backdoors);
@@ -91,7 +99,8 @@ class Scanner extends CI_Controller {
         force_download('backdoors.txt', $content);
     }
 
-    private function delete_directory($dir) {
+    private function delete_directory($dir)
+    {
         if (!is_dir($dir)) {
             return;
         }
